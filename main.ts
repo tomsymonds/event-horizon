@@ -43,8 +43,8 @@ export default class EventHorizon extends Plugin {
 			name: 'Create Event',
 			editorCallback: (editor: Editor, view: MarkdownView) => {
 				const text = editor.getSelection();
-				const event = new Event();
-				const contents = parseText(text);
+				const event = new Event(text);
+				console.log("Event created:", event);
 				new EventModal(this.app, {type: "Create", text}).open()
 				//editor.replaceSelection('Sample Editor Command');
 			}
