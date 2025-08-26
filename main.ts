@@ -1,23 +1,24 @@
 import { App, Editor, MarkdownView, Modal, Notice, Plugin, PluginSettingTab, Setting } from 'obsidian';
-
+import * as chrono from 'chrono-node';
+import Event from 'Event'
 // Remember to rename these classes and interfaces!
 
-interface MyPluginSettings {
+interface EventHorizonSettings {
 	mySetting: string;
 }
 
-const DEFAULT_SETTINGS: MyPluginSettings = {
+const DEFAULT_SETTINGS: EventHorizonSettings = {
 	mySetting: 'default'
 }
 
-export default class MyPlugin extends Plugin {
-	settings: MyPluginSettings;
+export default class EventHorizon extends Plugin {
+	settings: EventHorizonSettings;
 
 	async onload() {
 		await this.loadSettings();
 
 		// This creates an icon in the left ribbon.
-		const ribbonIconEl = this.addRibbonIcon('dice', 'Sample Plugin', (evt: MouseEvent) => {
+		const ribbonIconEl = this.addRibbonIcon('dice', 'Event Horizon', (evt: MouseEvent) => {
 			// Called when the user clicks the icon.
 			new Notice('Event Horizon!');
 		});
@@ -38,11 +39,14 @@ export default class MyPlugin extends Plugin {
 		});
 		// This adds an editor command that can perform some operation on the current editor instance
 		this.addCommand({
-			id: 'sample-editor-command',
-			name: 'Sample editor command',
+			id: 'event-horizon-command',
+			name: 'Create Event',
 			editorCallback: (editor: Editor, view: MarkdownView) => {
-				console.log(editor.getSelection());
-				editor.replaceSelection('Sample Editor Command');
+				const text = editor.getSelection();
+				const event = new Event();
+				const contents = parseText(text);
+				new EventModal(this.app, {type: "Create", text}).open()
+				//editor.replaceSelection('Sample Editor Command');
 			}
 		});
 		// This adds a complex command that can check whether the current state of the app allows execution of the command
@@ -71,7 +75,6 @@ export default class MyPlugin extends Plugin {
 		// If the plugin hooks up any global DOM events (on parts of the app that doesn't belong to this plugin)
 		// Using this function will automatically remove the event listener when this plugin is disabled.
 		this.registerDomEvent(document, 'click', (evt: MouseEvent) => {
-			console.log('click', evt);
 		});
 
 		// When registering intervals, this function will automatically clear the interval when the plugin is disabled.
@@ -107,10 +110,31 @@ class SampleModal extends Modal {
 	}
 }
 
-class SampleSettingTab extends PluginSettingTab {
-	plugin: MyPlugin;
+class EventModal extends Modal {
+	constructor(app: App, contents: any) {
+		super(app);
+		const {type, text} = contents	
+		this.setTitle(`${type} Event`)
+		this.contentEl.setText(text);
+	}
 
-	constructor(app: App, plugin: MyPlugin) {
+	
+
+	onOpen() {
+		const {contentEl} = this;
+		// contentEl.setText('Event created!');
+	}
+
+	onClose() {
+		const {contentEl} = this;
+		contentEl.empty();
+	}
+}
+
+class SampleSettingTab extends PluginSettingTab {
+	plugin: EventHorizon;
+
+	constructor(app: App, plugin: EventHorizon) {
 		super(app, plugin);
 		this.plugin = plugin;
 	}
@@ -132,3 +156,7 @@ class SampleSettingTab extends PluginSettingTab {
 				}));
 	}
 }
+
+const parseText = (text: string) => {
+	return chrono.parse(text);
+}	
