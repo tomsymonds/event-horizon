@@ -43,10 +43,9 @@ export default class EventHorizon extends Plugin {
 			name: 'Create Event',
 			editorCallback: (editor: Editor, view: MarkdownView) => {
 				const text = editor.getSelection();
-				const event = new Event(text);
-				console.log("Event created:", event);
-				new EventModal(this.app, {type: "Create", text}).open()
-				//editor.replaceSelection('Sample Editor Command');
+				const currentFile = this.app.workspace.getActiveFile();
+				const event = new Event(text, currentFile);
+				new EventModal(this.app, "Create", event, () => true).open()
 			}
 		});
 		// This adds a complex command that can check whether the current state of the app allows execution of the command
@@ -110,15 +109,47 @@ class SampleModal extends Modal {
 	}
 }
 
-class EventModal extends Modal {
-	constructor(app: App, contents: any) {
-		super(app);
-		const {type, text} = contents	
-		this.setTitle(`${type} Event`)
-		this.contentEl.setText(text);
-	}
+export class ExampleModal extends Modal {
+  constructor(app: App, onSubmit: (result: string) => void) {
+    super(app);
+	this.setTitle('What\'s your name?');
 
-	
+	let name = '';
+    new Setting(this.contentEl)
+      .setName('Name')
+      .addText((text) =>
+        text.onChange((value) => {
+          name = value;
+        }));
+
+    new Setting(this.contentEl)
+      .addButton((btn) =>
+        btn
+          .setButtonText('Submit')
+          .setCta()
+          .onClick(() => {
+            this.close();
+            onSubmit(name);
+          }));
+  }
+}
+
+class EventModal extends Modal {
+	constructor(app: App,type: string, event: Event, onSubmit: (result: string) => void) {
+		super(app);
+		this.setTitle(`${type} Event`)
+		//this.contentEl.setText(event.description);
+		let newDescription = event.description;
+		new Setting(this.contentEl)
+			.setName('Description')
+			.addTextArea((text) =>
+				text
+					.setValue(event.description)
+					.onChange((value) => {
+						newDescription = value;
+					})
+				)
+			}
 
 	onOpen() {
 		const {contentEl} = this;
@@ -157,6 +188,3 @@ class SampleSettingTab extends PluginSettingTab {
 	}
 }
 
-const parseText = (text: string) => {
-	return chrono.parse(text);
-}	

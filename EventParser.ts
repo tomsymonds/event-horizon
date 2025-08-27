@@ -33,7 +33,7 @@ export default class EventParser {
                 hour: basicResults[0].start.get('hour') || null,
                 minute: basicResults[0].start.get('minute') || null,
                 second: basicResults[0].start.get('second') || null,
-                text: basicResults[0].text
+                text: basicResults[0].text || ""
             }
         }       
         const yearResults = findYearsWithContext(text);
@@ -45,7 +45,7 @@ export default class EventParser {
                 minute: null,
                 second: null,
                 year: yearResults[0].year,
-                text: yearResults[0].text
+                text: yearResults[0].text || ""
             }
         }
     }
