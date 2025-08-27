@@ -35,18 +35,20 @@ export default class EventParser {
                 second: basicResults[0].start.get('second') || null,
                 text: basicResults[0].text || ""
             }
-        }       
-        const yearResults = findYearsWithContext(text);
-        if (yearResults.length > 0){
-            this.results = {
-                day: null,
-                month: null,    
-                hour: null,
-                minute: null,
-                second: null,
-                year: yearResults[0].year,
-                text: yearResults[0].text || ""
-            }
+
+        } else {    
+          const yearResults = findYearsWithContext(text);
+          if (yearResults.length > 0){
+              this.results = {
+                  day: null,
+                  month: null,    
+                  hour: null,
+                  minute: null,
+                  second: null,
+                  year: yearResults[0].year,
+                  text: yearResults[0].text || ""
+              }
+          }
         }
     }
 }

@@ -1,6 +1,9 @@
 import { App, Editor, MarkdownView, Modal, Notice, Plugin, PluginSettingTab, Setting } from 'obsidian';
 import * as chrono from 'chrono-node';
 import Event from 'Event'
+import { saveTextFile } from 'fileManagement';
+
+
 // Remember to rename these classes and interfaces!
 
 interface EventHorizonSettings {
@@ -45,7 +48,11 @@ export default class EventHorizon extends Plugin {
 				const text = editor.getSelection();
 				const currentFile = this.app.workspace.getActiveFile();
 				const event = new Event(text, currentFile);
-				new EventModal(this.app, "Create", event, () => true).open()
+				const save = (newEvent: any) => {
+					saveTextFile(this.app, `Events/${newEvent.fileName()}`, newEvent.toFile());
+        			new Notice("File saved!");
+				}
+				new EventModal(this.app, "Create", event, save).open()
 			}
 		});
 		// This adds a complex command that can check whether the current state of the app allows execution of the command
@@ -93,6 +100,8 @@ export default class EventHorizon extends Plugin {
 	}
 }
 
+
+
 class SampleModal extends Modal {
 	constructor(app: App) {
 		super(app);
@@ -110,7 +119,7 @@ class SampleModal extends Modal {
 }
 
 export class ExampleModal extends Modal {
-  constructor(app: App, onSubmit: (result: string) => void) {
+  constructor(app: App, onSubmit: any) {
     super(app);
 	this.setTitle('What\'s your name?');
 
@@ -135,21 +144,62 @@ export class ExampleModal extends Modal {
 }
 
 class EventModal extends Modal {
-	constructor(app: App,type: string, event: Event, onSubmit: (result: string) => void) {
+	constructor(app: App, type: string, event: Event, onSubmit: any) {
 		super(app);
 		this.setTitle(`${type} Event`)
 		//this.contentEl.setText(event.description);
-		let newDescription = event.description;
+		const eventValues = {
+			description: event.description,
+			day: event.text.day,
+			month: event.text.month,
+			year: event.text.year
+		}
 		new Setting(this.contentEl)
 			.setName('Description')
 			.addTextArea((text) =>
 				text
 					.setValue(event.description)
 					.onChange((value) => {
-						newDescription = value;
+						event.description = value;
 					})
 				)
-			}
+		new Setting(this.contentEl)
+			.setName('Day')
+			.addText((text) =>
+				text
+					.setValue(event.text.day)
+					.onChange((value) => {
+						event.day = Number(value);
+					})
+				)
+		new Setting(this.contentEl)
+			.setName('Month')
+			.addText((text) =>
+				text
+					.setValue(event.text.month)
+					.onChange((value) => {
+						event.month = Number(value);
+					})
+				)
+		new Setting(this.contentEl)
+			.setName('Year')
+			.addText((text) =>
+				text
+					.setValue(event.text.year)
+					.onChange((value) => {
+						event.year = Number(value);
+					})
+				)
+		new Setting(this.contentEl)
+      		.addButton((btn) => btn
+          	.setButtonText('Submit')
+          	.setCta()
+          	.onClick(() => {
+            	this.close();
+            	onSubmit(event);
+          }));
+	}
+		
 
 	onOpen() {
 		const {contentEl} = this;
