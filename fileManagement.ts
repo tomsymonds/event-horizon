@@ -1,4 +1,4 @@
-import { App, TFile, normalizePath } from "obsidian";
+import { App, TFile, normalizePath, MarkdownView, getFrontMatterInfo } from "obsidian";
 
 /**
  * Save a text file into the Obsidian vault.

@@ -1,5 +1,6 @@
 import EventParser from 'EventParser'
 
+//Class representing an event with date and description
 export default class Event {
     day: number | null = null
     month: number | null = null
@@ -11,35 +12,53 @@ export default class Event {
     currentFile
     description: string
     text: any
-    parsed: boolean = false
+    sourceNoteLink: string | null = null
+    projectLink: string | null = null
+    projectLinkName: string | "Project"
+    propertyNames: any
+    type: string = "Event"
+    tags: Array<string> = ["#Event"]
 
-    constructor(rawInput: string, currentFile: any){
+    constructor(rawInput: string, currentFile: any, parentMetadata: any, settings: any | "Project"){
+        this.propertyNames = {
+            type: "type",
+            tags: "tags",
+            day: "Day",
+            month: "Month",
+            year: "Year",
+            sourceNoteLink: "Source",
+            projectLink: settings.projectLinkName
+        }
         this.currentFile = currentFile
         this.rawInput = rawInput
-        const parsed = new EventParser(rawInput) 
-        this.story = `[[${this.currentFile.basename}]]`
+        this.projectLinkName = settings.projectLinkName
+        if(Object.keys(parentMetadata).length > 0){
+            this.sourceNoteLink = `[[${this.currentFile.basename}]]`
+            this.projectLink = parentMetadata.frontmatter[this.projectLinkName]? `${parentMetadata.frontmatter[this.projectLinkName]}` : ""
+        }
         //Default description is the rawInput
         this.description = this.rawInput
+        const parsed = new EventParser(rawInput) 
         if(parsed.results){
-            this.parsed = true
             this.day = parsed.results.day
             this.month = parsed.results.month
             this.year = parsed.results.year               
             this.hour = parsed.results.hour
             this.seconds = parsed.results.second
             //If there's a date, get an updated description
-            this.description = this.getDescription(parsed.results.text)
+            this.description = parsed.results.description
         }
         this.text = this.getDateText()
     }    
 
-    //Removes the date part from the description
+    //Formats the description by removing date text if present
     private getDescription(dateText: string){ 
         if (!dateText || dateText === "") return this.rawInput 
         const inputStrippedDate = this.rawInput.replace(dateText, '').trim()
         return inputStrippedDate.charAt(0).toUpperCase() + inputStrippedDate.slice(1)
     }
 
+    //Returns date parts as strings, empty if null
     private getDateText(){
         return {
             day: this.day ? this.day.toString() : "",
@@ -47,37 +66,37 @@ export default class Event {
             year: this.year ? this.year.toString() : ""
         }
     }
-
+    //Validates the event data
+    //Must have a year and a non-empty description
     private valid(){
-        console.log("Validating event", this)
-        if(this.day && (this.day < 1 || this.day > 31)) return false
-        if(this.month && (this.month < 1 || this.month > 12)) return false
-        if(this.year && this.year < 0) return false
-        if(!this.description || this.description.trim() === "") return false    
-        return true
+        return (this.year && this.year > 0) && (this.description && this.description.trim().length > 0) 
     }
 
+    //Formats the event as a markdown file
     toFile(){
         if(!this.valid()) return null
-        return `---\ndescription: ${this.description}\nday: ${this.day ? this.day : ""}\nmonth: ${this.month ? this.month : ""}\nyear: ${this.year ? this.year : ""}\nstory: ["${this.story}"]\n---`
+        const metadata: any = Object.keys(this.propertyNames).map((key: any) => {
+            const propertyKey = key as keyof typeof this
+            const valueString = `${this[propertyKey]}`
+            const valueStringWithLinks = this.isObsidianLink(valueString) ? `"${valueString}"` : valueString
+            return `${this.propertyNames[key]}: ${valueStringWithLinks || ""}`
+        })
+        return `---\n${metadata.join("\n")}\n---\n`
     }
 
+    //Generates a filename based on the event's date and description
     fileName(){
-        const dateParts = [this.day, this.month, this.year].filter(part => part !== null).map(part => String(part).padStart(2, '0'));
+        const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+        const monthName = this.month ? months[this.month - 1] : ""
+        const dateParts = [this.day, monthName, this.year].filter(part => part !== null).map(part => String(part).padStart(2, '0'));
         const dateStr = dateParts.join('-');
         return `${dateStr} • ${this.description}.md`
     }
 
-    // update(eventValues: {description: string, day: string, month: string, year: string}){
-    //     console.log(this)
-    //     console.log(eventValues)
+    isObsidianLink(input: string) {
+    const regex = /^\[\[([^[\]]+?)(\|([^[\]]+))?\]\]$/;
+    return regex.test(input);
 
-    //     this.description = eventValues.description
-    //     this.day = Number(eventValues.day)
-    //     this.text.month = Number(eventValues.month) 
-    //     this.text.year = Number(eventValues.year) 
-    //     return this.valid()
-    // }
 }
 
-
+}

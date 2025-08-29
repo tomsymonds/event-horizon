@@ -3,23 +3,25 @@ import * as chrono from 'chrono-node';
 import Event from 'Event'
 import { saveTextFile } from 'fileManagement';
 
-
-// Remember to rename these classes and interfaces!
-
+//An Obsidian plugin to create and manage dated events
 interface EventHorizonSettings {
-	mySetting: string;
+	//Not yet on the settings page
+	tags: Array<string>;
+	type: string;
+	projectDisplayName: string;
 }
 
 const DEFAULT_SETTINGS: EventHorizonSettings = {
-	mySetting: 'default'
-}
+	tags: ["#Event"],
+	type: "Event",
+	projectDisplayName: "Story"
+}	
 
 export default class EventHorizon extends Plugin {
 	settings: EventHorizonSettings;
 
 	async onload() {
 		await this.loadSettings();
-
 		// This creates an icon in the left ribbon.
 		const ribbonIconEl = this.addRibbonIcon('dice', 'Event Horizon', (evt: MouseEvent) => {
 			// Called when the user clicks the icon.
@@ -40,21 +42,31 @@ export default class EventHorizon extends Plugin {
 				new SampleModal(this.app).open();
 			}
 		});
-		// This adds an editor command that can perform some operation on the current editor instance
+		
+		// Create an event from selected text, open a modal to edit details, and save to file
 		this.addCommand({
 			id: 'event-horizon-command',
 			name: 'Create Event',
 			editorCallback: (editor: Editor, view: MarkdownView) => {
 				const text = editor.getSelection();
 				const currentFile = this.app.workspace.getActiveFile();
-				const event = new Event(text, currentFile);
+				const parentMetadata = currentFile? this.app.metadataCache.getFileCache(currentFile) : null
+				const settings = {
+					projectLinkName: this.settings.projectDisplayName
+				}
+				const event = new Event(text, currentFile, parentMetadata, settings);
 				const save = (newEvent: any) => {
+					if(!newEvent.valid()){	
+						new Notice("Event is not valid and cannot be saved\nIt must have at least a year and a description");
+						return
+					}
 					saveTextFile(this.app, `Events/${newEvent.fileName()}`, newEvent.toFile());
         			new Notice("File saved!");
 				}
-				new EventModal(this.app, "Create", event, save).open()
+				new EventModal(this.app, "Create", event, settings, save).open()
 			}
 		});
+
 		// This adds a complex command that can check whether the current state of the app allows execution of the command
 		this.addCommand({
 			id: 'open-sample-modal-complex',
@@ -130,6 +142,7 @@ export class ExampleModal extends Modal {
         text.onChange((value) => {
           name = value;
         }));
+		 
 
     new Setting(this.contentEl)
       .addButton((btn) =>
@@ -140,14 +153,25 @@ export class ExampleModal extends Modal {
             this.close();
             onSubmit(name);
           }));
+  
   }
 }
 
 class EventModal extends Modal {
-	constructor(app: App, type: string, event: Event, onSubmit: any) {
+	constructor(app: App, type: string, event: Event, settings: any, onSubmit: any) {
 		super(app);
 		this.setTitle(`${type} Event`)
-		//this.contentEl.setText(event.description);
+		//Add a listener for Enter key to submit the form
+		this.scope.register([], 'Enter', (evt: KeyboardEvent) => {
+			if (evt.isComposing) {
+				return;
+			}
+			evt.preventDefault()	
+			const actionBtn = document
+					.getElementsByClassName('mod-cta')
+					.item(0) as HTMLButtonElement | null;
+				actionBtn?.click();
+		});
 		const eventValues = {
 			description: event.description,
 			day: event.text.day,
@@ -191,6 +215,24 @@ class EventModal extends Modal {
 					})
 				)
 		new Setting(this.contentEl)
+			.setName('Parent')
+			.addText((text) =>
+				text
+					.setValue(event.sourceNoteLink || "")
+					.onChange((value) => {
+						event.sourceNoteLink = `"${value}"`;
+					})
+				)
+		new Setting(this.contentEl)
+			.setName(settings.projectLinkName)
+			.addText((text) =>
+				text
+					.setValue(event.projectLink || "")
+					.onChange((value) => {
+						event.projectLink = `"${value}"`;
+					})
+				)
+		new Setting(this.contentEl)
       		.addButton((btn) => btn
           	.setButtonText('Submit')
           	.setCta()
@@ -226,15 +268,27 @@ class SampleSettingTab extends PluginSettingTab {
 		containerEl.empty();
 
 		new Setting(containerEl)
-			.setName('Setting #1')
-			.setDesc('It\'s a secret')
+			.setName('Default type')
+			.setDesc('Add this type to every event created')
 			.addText(text => text
-				.setPlaceholder('Enter your secret')
-				.setValue(this.plugin.settings.mySetting)
+				.setPlaceholder('Type')
+				.setValue(this.plugin.settings.type)
 				.onChange(async (value) => {
-					this.plugin.settings.mySetting = value;
+					this.plugin.settings.type = value;
 					await this.plugin.saveSettings();
 				}));
+
+		new Setting(containerEl)
+			.setName('Display name for projects')
+			.setDesc('Use this name when linking to projects')
+			.addText(text => text
+				.setPlaceholder('Display name')
+				.setValue(this.plugin.settings.projectDisplayName)
+				.onChange(async (value) => {
+					this.plugin.settings.projectDisplayName = value;
+					await this.plugin.saveSettings();
+				}));
+
 	}
 }
 

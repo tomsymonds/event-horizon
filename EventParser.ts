@@ -1,5 +1,6 @@
 import * as chrono from 'chrono-node';
 
+//Custom function to find years with context words
 function findYearsWithContext(text: string) {
   // Regex: optional preceding words (by|in|before|after) + space + year
   const regex = /\b(?:by|in|before|after)?\s*(1[0-9]{3}|2[0-9]{3})\b/gi;
@@ -18,7 +19,7 @@ function findYearsWithContext(text: string) {
   return matches;
 }
 
-
+//Parses text to extract event information
 export default class EventParser {
 
     results: any  
@@ -26,16 +27,16 @@ export default class EventParser {
     constructor(text:string){
         const basicResults = chrono.parse(text);
         if (basicResults.length > 0){
+            const date = basicResults[0].start as any
             this.results =  {
-                day: basicResults[0].start.get('day') || null,
-                month: basicResults[0].start.get('month') || null,
-                year: basicResults[0].start.get('year') || null,
-                hour: basicResults[0].start.get('hour') || null,
-                minute: basicResults[0].start.get('minute') || null,
-                second: basicResults[0].start.get('second') || null,
-                text: basicResults[0].text || ""
+                day: date.knownValues.day || null,
+                month: date.knownValues.month || null,
+                year: date.knownValues.year || null,
+                hour: date.knownValues.hour || null,
+                minute: date.knownValues.minute || null,
+                second: date.knownValues.second || null,
+                dateText: basicResults[0].text || "",
             }
-
         } else {    
           const yearResults = findYearsWithContext(text);
           if (yearResults.length > 0){
@@ -46,9 +47,19 @@ export default class EventParser {
                   minute: null,
                   second: null,
                   year: yearResults[0].year,
-                  text: yearResults[0].text || ""
+                  dateText: yearResults[0].text || ""
               }
           }
         }
+
+      if(this.results) this.results.description = this.removeDateWords(text, this.results.dateText); 
+    }
+    //Clears words like "in", "on", "after" that may precede date text
+    private removeDateWords(text: string, dateText: string){
+      if (!dateText || dateText === "") return text
+        const regex = new RegExp("\\b(?:in|on|after|during|in early|in late|in mid|)\\s+" + dateText + "[^\\w]*", "gi");
+        const cleanedText: string = text.replace(regex, "");
+        const capitalizedText = cleanedText.charAt(0).toUpperCase() + cleanedText.slice(1);
+        return capitalizedText.trim();
     }
 }
