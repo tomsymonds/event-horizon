@@ -1,4 +1,8 @@
-import { App, TFile, normalizePath, MarkdownView, getFrontMatterInfo } from "obsidian";
+import { App, TFile, normalizePath, Vault} from "obsidian";
+import { BaseNote } from 'BaseNote'
+import Event from "Event";
+
+//Classes for managing files in the Obsidian vault
 
 /**
  * Save a text file into the Obsidian vault.
@@ -46,11 +50,90 @@ export async function saveTextFile(app: App, filePath: string, content: string):
     }
 }
 
+
+
 export class FileManager {
     app: App
+    settings: any
+    vault: Vault
 
-    constructor(app: App) {
+    constructor(app: App, settings: any | {}) {
         this.app = app
+        this.settings = settings
+        this.vault = app.vault
+    }
+
+    //Create a new file in the vault with the specified type and metadata
+     createFile(options: any): any{
+        const { type, metadata, onCreate } = options
+        if(!onCreate) return {status: "error", message: "ERROR: No onCreate callback provided in FileManager createFile"}
+        const newFile = this.getFileFromType(type, null)
+        this.vault.create(newFile.path(), "").then((tFile) => {
+            newFile.tFile = tFile
+            newFile.setMetadata(metadata)
+            this.app.fileManager.processFrontMatter(tFile, (frontmatter) => {
+                Object.keys(newFile.metadata).forEach((key) => {
+                    frontmatter[key] = newFile.metadata[key];
+                });
+            })
+            newFile.metadataIsLoaded = true
+            newFile.isSaved = true
+            onCreate({status: "ok", message: `Created new ${type}`})
+        }).catch((error) => {
+            if(error == "Error: File already exists."){
+                onCreate({status: "ok", message: `${type} already exists`})
+            } else {
+                onCreate({status: "error", message: `Error creating ${type}: ${error}`})
+            }
+        });
+        return {status: "pending", message:""}  
+    }
+
+    updateFile(file: BaseNote){
+        if(!(file.tFile instanceof TFile)) return;
+        if(!file.metadata) return
+        this.app.fileManager.processFrontMatter(file.tFile, (frontMatter) => {
+            Object.keys(file.metadata).forEach((key) => {
+                frontMatter[key] = file.metadata[key];
+            })
+        })
+    }
+
+    // Return an instance of a file based on its type
+    getFileFromType(type: string, file: TFile | null): any {
+        const types: { [key: string]: (file: TFile | null) => any } = {
+            "Event": (file: TFile | null) => { return new Event(file, this.settings) }
+        }
+        const requestedType = types[type]
+        return requestedType ? requestedType(file) : new BaseNote(file)
+    }
+
+    // Get a file from the vault and return an instance of the correct class based on its type
+    getFile(filePath: string): any | null {
+        const vault = this.app.vault;   
+        const normalizedFilePath = normalizePath(filePath)
+        let baseFile = vault.getFileByPath(normalizedFilePath);
+        if(baseFile){
+            const fileCache = this.app.metadataCache.getFileCache(baseFile)
+            const metadata = fileCache? 
+            fileCache.frontmatter? 
+                fileCache.frontmatter : {}
+            : {}
+            const newFile = this.getFileFromType(metadata.type, baseFile)
+            newFile.metadata = metadata
+            newFile.metadataIsLoaded = fileCache? true : false
+            newFile.isSaved = true
+            return newFile
+        } 
+        return false
+    }
+
+    // Get a Promise to return the contents of a Note
+    async getNoteContents(Note: BaseNote): Promise<string | null> {
+        if(Note.tFile instanceof TFile){
+            return this.app.vault.cachedRead(Note.tFile)
+        }
+        return null
     }
 
     //Check if a file exists in the vault
@@ -61,9 +144,18 @@ export class FileManager {
         return file instanceof TFile;
     }
 
-    
+    saveNote(note: BaseNote): void {
 
-
+        if(!(note.tFile instanceof TFile)) return;
+        if(!note.metadata) return
+        this.app.fileManager.processFrontMatter(note.tFile, (existingMetadata) => {
+            Object.keys(note.metadata).forEach((key) => {
+                existingMetadata[key] = note.metadata[key];
+                console.log(existingMetadata)
+            })
+        });
+    }
+        
 }
 
 //Formats property values for Obsidian frontmatter
@@ -78,16 +170,19 @@ export class PropertyFormatter {
         return `"${value}"`;
     }
 
+    //
     private formattedValue(value: any): string {
         // if (typeof value === 'string') {
         //     return `${value}`;
         // }
-        return String(value);
+        return `${String(value)}`;
     }
 
+    //
     private formattedArray(value: any[]): string {
-        const arrayString: Array<string> = value.map((v: any) => `  - ${v}\n`);
-        return `\n${arrayString.join('')}`;
+        if(value.length == 0) return "";
+        const arrayString: Array<string> = value.map((v: any) => `  - ${v}`);
+        return `\n${arrayString.join('\n')}`;
     }
 
     // Do formatting
@@ -98,6 +193,7 @@ export class PropertyFormatter {
         (v) => this.formattedValue(v) // fallback
     ];
 
+    // Formats a value based on its type
     public formatValue(value: any): string {
         for (const fn of this.formatters) {
             const result = fn(value);

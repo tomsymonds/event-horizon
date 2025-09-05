@@ -1,7 +1,8 @@
 import { App, Editor, MarkdownView, Notice, Plugin, PluginSettingTab, Setting } from 'obsidian';
 import Event from 'Event'
 import EventModal from 'EventModal';
-import { saveTextFile } from 'fileManagement';
+import { saveTextFile, FileManager } from 'fileManagement';
+
 
 //An Obsidian plugin to create and manage dated events
 interface EventHorizonSettings {
@@ -25,25 +26,48 @@ export default class EventHorizon extends Plugin {
 		// This adds a status bar item to the bottom of the app. Does not work on mobile apps.
 		const statusBarItemEl = this.addStatusBarItem();
 		statusBarItemEl.setText('Status Bar Text');
+
+
+		this.addCommand({
+			id: 'open-fileManager-test',
+			name: 'File Manager Test',
+			editorCallback: (editor: Editor, view: MarkdownView) => {
+				const fileManager = new FileManager(this.app, this.settings)
+				const result = fileManager.createFile({
+					type: "",
+					metadata: {day: "24", notAllowed: "test"},
+					onCreate: (result: any) => {	
+						new Notice(result.message);
+						if(result.status === 'error') {
+							console.log(result.message)
+						}
+						//Add functionality here to prompt for a new title if the file already exists
+					}
+				})
+				if(result.status === 'error') {
+					console.log(result.message)
+				}
+			}
+		});
 		
 		// Create an event from selected text, open a modal to edit details, and save to file
 		this.addCommand({
 			id: 'event-horizon-command-create',
 			name: 'Create Event',
 			editorCallback: (editor: Editor, view: MarkdownView) => {
-				const text = editor.getSelection();
-				const currentFile = this.app.workspace.getActiveFile();
-				const parentMetadata = currentFile? this.app.metadataCache.getFileCache(currentFile) : null
-				const event = new Event(text, currentFile, parentMetadata, this.settings, false);
-				const save = (newEvent: any) => {
-					if(!newEvent.valid()){	
-						new Notice("Event is not valid and cannot be saved\nIt must have at least a year and a description");
-						return
-					}
-					saveTextFile(this.app,`Events/${newEvent.fileName()}`, newEvent.toFile());
-        			new Notice("File saved!");
-				}
-				new EventModal(this.app, "Create", event, this.settings, save).open()
+				// const text = editor.getSelection();
+				// const currentFile = this.app.workspace.getActiveFile();
+				// const parentMetadata = currentFile? this.app.metadataCache.getFileCache(currentFile) : null
+				// const event = new Event(text, currentFile, parentMetadata, this.settings, false);
+				// const save = (newEvent: any) => {
+				// 	if(!newEvent.valid()){	
+				// 		new Notice("Event is not valid and cannot be saved\nIt must have at least a year and a description");
+				// 		return
+				// 	}
+				// 	saveTextFile(this.app,`Events/${newEvent.fileName()}`, newEvent.toFile());
+        		// 	new Notice("File saved!");
+				// }
+				// new EventModal(this.app, "Create", event, this.settings, save).open()
 			}
 		});
 
