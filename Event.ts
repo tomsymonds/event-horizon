@@ -1,6 +1,5 @@
 import EventParser from 'EventParser'
 import { BaseNote } from 'BaseNote'
-import { TFile } from 'obsidian'
 
 //Class representing an event with date and description
 export default class Event extends BaseNote {
@@ -15,9 +14,9 @@ export default class Event extends BaseNote {
     // currentFile
     // description: string
     // text: any
-    // sourceNoteLink: string | null = null
+    sourceNoteLink: string | null = null
     // projectLink: string | null = null
-    // projectLinkName: string | "Project"
+    projectLinkName: string | "Project"
     propertyNames: any
     // type: string = "Event"
     // tags: Array<string> | []
@@ -27,21 +26,20 @@ export default class Event extends BaseNote {
         tags: [],
         day: "",
         month: "",
-        year: ""
+        year: "",
+        source: "",
+        story: ""
     }
+    parentMetadataKeys = {
+        name: "source", 
+        story: "story"
+    }
+    defaultName: "New Event"
 
-    constructor(file: TFile | null, settings: any | {}) {
-        super(file, settings)
-        this.propertyNames = {
-            day: "day",
-            month: "month",
-            year: "year", 
-            source: "source",
-            project: "project",
-        }
-
+    constructor(settings: any | {}) {
+        super()
         // this.currentFile = currentFile
-        // this.projectLinkName = settings.projectLinkName
+        this.projectLinkName = settings.projectLinkName
         // this.tags = settings.tags ? settings.tags.split(" ") : []
         // console.log("settings", settings)
         // console.log("tags", this.tags)

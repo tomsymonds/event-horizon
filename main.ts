@@ -1,7 +1,7 @@
 import { App, Editor, MarkdownView, Notice, Plugin, PluginSettingTab, Setting } from 'obsidian';
 import Event from 'Event'
 import EventModal from 'EventModal';
-import { saveTextFile, FileManager } from 'fileManagement';
+import { FileManager } from 'fileManagement';
 
 
 //An Obsidian plugin to create and manage dated events
@@ -33,9 +33,14 @@ export default class EventHorizon extends Plugin {
 			name: 'File Manager Test',
 			editorCallback: (editor: Editor, view: MarkdownView) => {
 				const fileManager = new FileManager(this.app, this.settings)
+
 				const result = fileManager.createFile({
-					type: "",
-					metadata: {day: "24", notAllowed: "test"},
+					type: "Event",
+					path: "Test folder/testing parent creation",
+					metadata: {
+						day: "24", 
+						notAllowed: "test",
+					},
 					onCreate: (result: any) => {	
 						new Notice(result.message);
 						if(result.status === 'error') {
@@ -47,6 +52,17 @@ export default class EventHorizon extends Plugin {
 				if(result.status === 'error') {
 					console.log(result.message)
 				}
+
+				// fileManager.updateFile(
+				// 	"Test folder/A new event", 
+				// 	{day: "01", month: "01", year: "2003", tags: ["Test", "AnotherTest"], sourceNoteLink: `[[${parent?.basename}]]`}, 
+				// 	(result: any) => {
+				// 		new Notice(result.message);
+				// 		console.log(result.message)
+				// 		console.log(result.file)
+				// 	//Add functionality here to prompt for a new title if the file already exists	
+				// 	}
+				// )
 			}
 		});
 		

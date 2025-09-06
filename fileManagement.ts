@@ -3,59 +3,11 @@ import { BaseNote } from 'BaseNote'
 import Event from "Event";
 
 //Classes for managing files in the Obsidian vault
-
-/**
- * Save a text file into the Obsidian vault.
- * If the file exists, it will be overwritten.
- *
- * @param app - The Obsidian App instance
- * @param filePath - Path inside the vault (e.g. "Notes/MyFile.md")
- * @param content - The text to write into the file
- */
-export async function createTextFile(app: App, filePath: string, content: string): Promise<TFile> {
-    const vault = app.vault;
-    const normalizedFilePath = normalizePath(filePath)
-
-    // Check if the file already exists
-    let file = vault.getAbstractFileByPath(normalizedFilePath);
-
-    if (file instanceof TFile) {
-        // If it exists, overwrite it
-        console.log("overwrite")
-        await vault.modify(file, content);
-        return file;
-    } else {
-        console.log("create")
-        // If not, create a new file
-        return await vault.create(normalizedFilePath, content);
-    }
-}
-
-export async function saveTextFile(app: App, filePath: string, content: string): Promise<TFile> {
-    const vault = app.vault;
-    const normalizedFilePath = normalizePath(filePath)
-
-    // Check if the file already exists
-    let file = vault.getAbstractFileByPath(normalizedFilePath);
-
-    if (file instanceof TFile) {
-        // If it exists, overwrite it
-        console.log("overwrite")
-        await vault.modify(file, content);
-        return file;
-    } else {
-        console.log("create")
-        // If not, create a new file
-        return await vault.create(normalizedFilePath, content);
-    }
-}
-
-
-
 export class FileManager {
     app: App
     settings: any
     vault: Vault
+    currentFile: BaseNote | null = null
 
     constructor(app: App, settings: any | {}) {
         this.app = app
@@ -64,68 +16,134 @@ export class FileManager {
     }
 
     //Create a new file in the vault with the specified type and metadata
+    //Type: the type of file to create (e.g., "Event")
+    //Name: the name of the file (without extension)
+    //Metadata: an object containing metadata to add to the file frontmatter
+    //onCreate: a callback function to call when the file is created or if there is an error
      createFile(options: any): any{
-        const { type, metadata, onCreate } = options
+        const { type, path, metadata, parent, onCreate} = options
         if(!onCreate) return {status: "error", message: "ERROR: No onCreate callback provided in FileManager createFile"}
-        const newFile = this.getFileFromType(type, null)
-        this.vault.create(newFile.path(), "").then((tFile) => {
+        const { fullPath, name, folder } = this.pathParts(path)
+        if(this.fileExists(fullPath)){
+            onCreate({status: "error", message: `File exists`})
+            return
+        }
+        const newFile = this.getFileFromType(type)
+        this.vault.create(fullPath, "").then((tFile) => {
             newFile.tFile = tFile
             newFile.setMetadata(metadata)
+            if(newFile.parentMetadataKeys && Object.keys(newFile.parentMetadataKeyslength > 0)){
+                const parentMetadata = this.getActiveFileMetadata()
+                if(parentMetadata){
+                    this.addMatchingKeys(parentMetadata, newFile.parentMetadataKeys, newFile.metadata)
+                }
+            }
             this.app.fileManager.processFrontMatter(tFile, (frontmatter) => {
                 Object.keys(newFile.metadata).forEach((key) => {
                     frontmatter[key] = newFile.metadata[key];
                 });
             })
-            newFile.metadataIsLoaded = true
-            newFile.isSaved = true
-            onCreate({status: "ok", message: `Created new ${type}`})
+            onCreate({status: "ok", message: `Created new ${type}: ${name} in ${folder}`, file: newFile})
         }).catch((error) => {
-            if(error == "Error: File already exists."){
-                onCreate({status: "ok", message: `${type} already exists`})
-            } else {
-                onCreate({status: "error", message: `Error creating ${type}: ${error}`})
-            }
+            onCreate({status: "error", message: `Error creating ${type}: ${error}`})
         });
         return {status: "pending", message:""}  
     }
 
-    updateFile(file: BaseNote){
-        if(!(file.tFile instanceof TFile)) return;
-        if(!file.metadata) return
+    // Update the metadata of the current file. Does not update the file contents.
+    updateFile(path: string, metadata: any, onUpdate: any): any{
+        if(!onUpdate) return {status: "error", message: "No onUpdate callback provided"}
+        const { fullPath, name } = this.pathParts(path)
+        const fileResult = this.getFile(fullPath)
+        if(fileResult.status === "error") {
+            onUpdate({status: "error", message: fileResult.message})
+            return
+        }
+        const file = fileResult.file
+        if(!file) onUpdate({status: "error", message: "No file to update"})
+        if(!(file.tFile instanceof TFile)) onUpdate({status: "error", message: "File has no TFile"});
+        if(!file.metadata) onUpdate({status: "error", message: "File has no metadata"})
+        if(!metadata || Object.keys(metadata).length === 0) onUpdate({status: "error", message: "No metadata to update"})
+        
+        file.setMetadata(metadata)
         this.app.fileManager.processFrontMatter(file.tFile, (frontMatter) => {
             Object.keys(file.metadata).forEach((key) => {
                 frontMatter[key] = file.metadata[key];
             })
         })
+        onUpdate({status: "ok", message: `Updated ${name}`, file: file})
+        return
     }
 
-    // Return an instance of a file based on its type
-    getFileFromType(type: string, file: TFile | null): any {
-        const types: { [key: string]: (file: TFile | null) => any } = {
-            "Event": (file: TFile | null) => { return new Event(file, this.settings) }
-        }
-        const requestedType = types[type]
-        return requestedType ? requestedType(file) : new BaseNote(file)
+    //Get the current active file in the workspace as a file object
+    getActiveFile(): BaseNote | null {
+        const currentTFile =  this.app.workspace.getActiveFile()
+        if(!currentTFile) return null
+        return this.getFileFromTFile(currentTFile)
     }
 
-    // Get a file from the vault and return an instance of the correct class based on its type
-    getFile(filePath: string): any | null {
+    // Get a file from the vault based on its path and return a file object
+    getFile(filePath: string): any {
+        if(!filePath) return {status: "error", message: "No file path provided"}
+        const { fullPath, name } = this.pathParts(filePath)
+        const tFile = this.getTFile(filePath)
+        if(!tFile) return {status: "error", message: `File not found: ${fullPath}`}
+        return this.getFileFromTFile(tFile as TFile)
+    }
+
+    // Get a TFile from the vault based on a path
+    getTFile(filePath: string): any {
         const vault = this.app.vault;   
-        const normalizedFilePath = normalizePath(filePath)
-        let baseFile = vault.getFileByPath(normalizedFilePath);
-        if(baseFile){
+        if(filePath) {
+            const { fullPath, name } = this.pathParts(filePath)
+            return vault.getAbstractFileByPath(fullPath);
+        }
+    }
+
+    //Convert a TFile to a file object with metadata
+    getFileFromTFile(baseFile: TFile): any {
+         if(baseFile && baseFile instanceof TFile){
             const fileCache = this.app.metadataCache.getFileCache(baseFile)
             const metadata = fileCache? 
             fileCache.frontmatter? 
                 fileCache.frontmatter : {}
             : {}
-            const newFile = this.getFileFromType(metadata.type, baseFile)
+            const newFile = this.getFileFromType(metadata.type)
             newFile.metadata = metadata
-            newFile.metadataIsLoaded = fileCache? true : false
-            newFile.isSaved = true
+            newFile.tFile = baseFile
+            this.currentFile = newFile
             return newFile
         } 
-        return false
+    }
+
+    getActiveFileMetadata(): any {
+        const activeFile = this.getActiveFile();
+        if(!activeFile) return {}
+		const name = activeFile.tFile ? `[[${activeFile.tFile.basename}]]` : null
+        if(!(activeFile && activeFile.tFile instanceof TFile)){
+            return {} 
+        } else {
+            return {
+                name,
+                ...activeFile.metadata
+            }    
+        }
+    }
+        
+    
+    // Get the path of the current file
+    getCurrentFilePath(): string | null {
+        if(!this.currentFile) return null
+        return this.currentFile?.path()
+    }
+
+    // Return an instance of a file based on its type
+    private getFileFromType(type: string): any {
+        const types: { [key: string]: () => any } = {
+            "Event": () => { return new Event(this.settings) }
+        }
+        const requestedType = types[type]
+        return requestedType ? requestedType() : new BaseNote()
     }
 
     // Get a Promise to return the contents of a Note
@@ -145,15 +163,31 @@ export class FileManager {
     }
 
     saveNote(note: BaseNote): void {
-
         if(!(note.tFile instanceof TFile)) return;
         if(!note.metadata) return
         this.app.fileManager.processFrontMatter(note.tFile, (existingMetadata) => {
             Object.keys(note.metadata).forEach((key) => {
                 existingMetadata[key] = note.metadata[key];
-                console.log(existingMetadata)
             })
         });
+    }
+
+    pathParts(filePath: string): {folder: string, name: string, fullPath: string} {
+        const parts = filePath.split("/")
+        const nameWithExt = parts.pop() || ""
+        const folder = parts.join("/")
+        const name = nameWithExt.endsWith(".md") ? nameWithExt.slice(0, -3) : nameWithExt
+        const fullPath = filePath.endsWith(".md") ? filePath : `${filePath}.md`
+        return {folder, name, fullPath}
+    }
+
+    addMatchingKeys(obj1: any, keys: any, obj2: any) {
+        Object.keys(keys).forEach((key: string) => {
+            if (obj1.hasOwnProperty(key)) {
+                obj2[keys[key]] = obj1[key];
+            }
+        });
+        return obj2;
     }
         
 }

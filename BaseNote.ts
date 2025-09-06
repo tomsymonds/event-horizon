@@ -4,11 +4,8 @@ import { PropertyFormatter } from "fileManagement"
 export class BaseNote {
 
     tFile: TFile | null
-    metadataIsLoaded: boolean = false  
-    isSaved: boolean = false
     settings: any
-    folder: string = "Test folder"
-    name: string
+    folder: string = ""
     defaultName: string = "New Note"
     metadata: any = {
         type: "BaseNote",
@@ -16,12 +13,9 @@ export class BaseNote {
     }
     contents: string = ""
 
-    constructor(tFile: TFile | null, settings: any = {}) { 
-        this.tFile = tFile
-        this.settings = settings
-    }
-
     public setMetadata(metadata: any){
+        console.log("setMetadata", metadata)
+        console.log(this.metadata)
         this.mergeMetadata(this.metadata, metadata)
     }
 
