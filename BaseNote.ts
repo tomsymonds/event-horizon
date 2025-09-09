@@ -3,10 +3,11 @@ import { PropertyFormatter } from "fileManagement"
 
 export class BaseNote {
 
+    //The text file in the vault containing the note's data
     tFile: TFile | null
     settings: any
-    folder: string = ""
-    defaultName: string = "New Note"
+    //The title of the note -- usually used for the tFile base name
+    title: string = "New Note"
     metadata: any = {
         type: "BaseNote",
         tags: []
@@ -14,12 +15,10 @@ export class BaseNote {
     contents: string = ""
 
     public setMetadata(metadata: any){
-        console.log("setMetadata", metadata)
-        console.log(this.metadata)
         this.mergeMetadata(this.metadata, metadata)
     }
 
-    private mergeMetadata<T extends Record<string, any>>(defaultMetadata: T, suppliedMetadata: Partial<T>): T {
+    public mergeMetadata<T extends Record<string, any>>(defaultMetadata: T, suppliedMetadata: Partial<T>): T {
         const result = { ...defaultMetadata };
         (Object.keys(suppliedMetadata) as (keyof T)[]).forEach((key) => {
             if (key in defaultMetadata) {
@@ -30,13 +29,7 @@ export class BaseNote {
         return result
     }
 
-    public path(){
-        const folder = this.folder.length > 0 ? `${this.folder}/` : ""
-        const name = this.tFile ? this.tFile.basename : `${this.defaultName}`
-        return `${folder}${name}.md`
-    }
-
-    //Formats the event as a markdown file
+    //Formats the event as a markdown text file
     public toString(){
         const formatter = new PropertyFormatter()
         const metadata: any = Object.keys(this.metadata).map((key) => {
@@ -45,6 +38,40 @@ export class BaseNote {
         return `---\n${metadata.join("\n")}\n---\n`
     }    
 
+    public isSaved(){
+        return this.tFile instanceof TFile
+    }
+
+    //Returns the creation date of the note
+    public createdAt(){
+        if(this.tFile){
+            return new Date(this.tFile.stat.ctime)
+        }
+    }
+
+    //Returns the updated date of the note
+    public updatedAt(){
+        if(this.tFile){
+            return new Date(this.tFile.stat.mtime)
+        }
+    }
+
+    public getStatusObject(statusArray: any[]){
+        const failed = statusArray.filter(s => !s.isValid)
+        return {
+            isValid: failed.length === 0,
+            message: failed.map(f => f.message).join(" | ")
+        }
+    }
+
+
+    status(){
+        const title: any = {
+                isValid: this.title && this.title.trim().length > 0,
+                message: "Title is required"
+        }
+        return this.getStatusObject([title])
+    }
 
 
 }

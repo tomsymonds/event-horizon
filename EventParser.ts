@@ -25,13 +25,18 @@ export default class EventParser {
     results: any  
 
     constructor(text:string){
+      console.log("parsing text", text)
         const basicResults = chrono.parse(text);
+        console.log("basicResults", basicResults)
+        let current_year = new Date().getFullYear()
+
         if (basicResults.length > 0){
             const date = basicResults[0].start as any
+            console.log(basicResults[0])
             this.results =  {
                 day: date.knownValues.day || null,
                 month: date.knownValues.month || null,
-                year: date.knownValues.year || null,
+                year: date.knownValues.year || current_year,
                 hour: date.knownValues.hour || null,
                 minute: date.knownValues.minute || null,
                 second: date.knownValues.second || null,
@@ -39,6 +44,7 @@ export default class EventParser {
             }
         } else {    
           const yearResults = findYearsWithContext(text);
+          console.log("yearResults", yearResults)
           if (yearResults.length > 0){
               this.results = {
                   day: null,

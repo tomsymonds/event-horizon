@@ -34,35 +34,40 @@ export default class EventHorizon extends Plugin {
 			editorCallback: (editor: Editor, view: MarkdownView) => {
 				const fileManager = new FileManager(this.app, this.settings)
 
-				const result = fileManager.createFile({
-					type: "Event",
-					path: "Test folder/testing parent creation",
-					metadata: {
-						day: "24", 
-						notAllowed: "test",
-					},
-					onCreate: (result: any) => {	
-						new Notice(result.message);
-						if(result.status === 'error') {
-							console.log(result.message)
-						}
-						//Add functionality here to prompt for a new title if the file already exists
-					}
-				})
-				if(result.status === 'error') {
-					console.log(result.message)
-				}
+				// const newEvent = new Event(this.settings)
+				// newEvent.setMetadata({
+				// 	description: "Sophie Birthday on 9 July 1969"
+				// })
 
-				// fileManager.updateFile(
-				// 	"Test folder/A new event", 
-				// 	{day: "01", month: "01", year: "2003", tags: ["Test", "AnotherTest"], sourceNoteLink: `[[${parent?.basename}]]`}, 
-				// 	(result: any) => {
+
+				// const createResult = fileManager.createFile({
+				// 	path: `Test folder/${newEvent.title}`,
+				// 	noteObj: newEvent,
+				// 	onCreate: (result: any) => {	
 				// 		new Notice(result.message);
-				// 		console.log(result.message)
-				// 		console.log(result.file)
-				// 	//Add functionality here to prompt for a new title if the file already exists	
+				// 		if(result.status === 'error') {
+				// 			console.log(result.message)
+				// 		}
+				// 		console.log(newEvent.isSaved())
+				// 		//Add functionality here to prompt for a new title if the file already exists
 				// 	}
-				// )
+				// })
+				// if(createResult.status === 'error') {
+				// 	console.log(createResult.message)
+				// }
+
+				// const getResult = fileManager.getFile("Test folder/24-Sep-1969 • Tom's Birthday")
+				// console.log(getResult.file.createdAt())
+
+
+
+				fileManager.updateFile(
+					"Test folder/06-May-2004 • Evan's Birthday", 
+					{description: "Evan's Birthday May 2004", tags: ["Evan", "AnotherTest"]}, 
+					(result: any) => {
+						new Notice(result.message);
+					}
+				)
 			}
 		});
 		
